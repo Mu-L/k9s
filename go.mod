@@ -3,8 +3,7 @@ module github.com/derailed/k9s
 go 1.15
 
 require (
-	github.com/Azure/go-autorest v14.0.0+incompatible // indirect
-	github.com/atotto/clipboard v0.1.2
+	github.com/atotto/clipboard v0.1.4
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/derailed/popeye v0.9.0
@@ -44,5 +43,4 @@ require (
 	k8s.io/metrics v0.18.8
 	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/yaml v1.2.0
-	vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787 // indirect
 )
