@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package view
 
 import (
@@ -26,13 +29,16 @@ func NewScaleExtender(r ResourceViewer) ResourceViewer {
 	return &s
 }
 
-func (s *ScaleExtender) bindKeys(aa ui.KeyActions) {
+func (s *ScaleExtender) bindKeys(aa *ui.KeyActions) {
 	if s.App().Config.K9s.IsReadOnly() {
 		return
 	}
-	aa.Add(ui.KeyActions{
-		ui.KeyS: ui.NewKeyAction("Scale", s.scaleCmd, true),
-	})
+	aa.Add(ui.KeyS, ui.NewKeyActionWithOpts("Scale", s.scaleCmd,
+		ui.ActionOpts{
+			Visible:   true,
+			Dangerous: true,
+		},
+	))
 }
 
 func (s *ScaleExtender) scaleCmd(evt *tcell.EventKey) *tcell.EventKey {
@@ -76,8 +82,6 @@ func (s *ScaleExtender) valueOf(col string) (string, error) {
 }
 
 func (s *ScaleExtender) makeScaleForm(sels []string) (*tview.Form, error) {
-	f := s.makeStyledForm()
-
 	factor := "0"
 	if len(sels) == 1 {
 		replicas, err := s.valueOf("READY")
@@ -90,6 +94,16 @@ func (s *ScaleExtender) makeScaleForm(sels []string) (*tview.Form, error) {
 		}
 		factor = strings.TrimRight(tokens[1], ui.DeltaSign)
 	}
+
+	styles := s.App().Styles.Dialog()
+	f := tview.NewForm().
+		SetItemPadding(0).
+		SetButtonsAlign(tview.AlignCenter).
+		SetButtonBackgroundColor(styles.ButtonBgColor.Color()).
+		SetButtonTextColor(styles.ButtonFgColor.Color()).
+		SetLabelColor(styles.LabelFgColor.Color()).
+		SetFieldTextColor(styles.FieldFgColor.Color())
+
 	f.AddInputField("Replicas:", factor, 4, func(textToCheck string, lastChar rune) bool {
 		_, err := strconv.Atoi(textToCheck)
 		return err == nil
@@ -119,28 +133,27 @@ func (s *ScaleExtender) makeScaleForm(sels []string) (*tview.Form, error) {
 			s.App().Flash().Infof("%s %s scaled successfully", s.GVR().R(), sels[0])
 		}
 	})
-
 	f.AddButton("Cancel", func() {
 		s.dismissDialog()
 	})
+	for i := 0; i < 2; i++ {
+		if b := f.GetButton(i); b != nil {
+			b.SetBackgroundColorActivated(styles.ButtonFocusBgColor.Color())
+			b.SetLabelColorActivated(styles.ButtonFocusFgColor.Color())
+		}
+	}
+
+	for i := 0; i < f.GetButtonCount(); i++ {
+		f.GetButton(i).
+			SetBackgroundColorActivated(styles.ButtonFocusBgColor.Color()).
+			SetLabelColorActivated(styles.ButtonFocusFgColor.Color())
+	}
 
 	return f, nil
 }
 
 func (s *ScaleExtender) dismissDialog() {
 	s.App().Content.RemovePage(scaleDialogKey)
-}
-
-func (s *ScaleExtender) makeStyledForm() *tview.Form {
-	f := tview.NewForm()
-	f.SetItemPadding(0)
-	f.SetButtonsAlign(tview.AlignCenter).
-		SetButtonBackgroundColor(tview.Styles.PrimitiveBackgroundColor).
-		SetButtonTextColor(tview.Styles.PrimaryTextColor).
-		SetLabelColor(tcell.ColorAqua).
-		SetFieldTextColor(tcell.ColorOrange)
-
-	return f
 }
 
 func (s *ScaleExtender) scale(ctx context.Context, path string, replicas int) error {

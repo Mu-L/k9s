@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package model
 
 import (
@@ -20,7 +23,7 @@ const (
 	FlashErr
 )
 
-// LevelMessage tracks an message and severity.
+// LevelMessage tracks a message and severity.
 type LevelMessage struct {
 	Level FlashLevel
 	Text  string

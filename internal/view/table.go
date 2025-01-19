@@ -1,13 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package view
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/derailed/k9s/internal"
 	"github.com/derailed/k9s/internal/client"
+	"github.com/derailed/k9s/internal/config"
 	"github.com/derailed/k9s/internal/model"
+	"github.com/derailed/k9s/internal/render"
 	"github.com/derailed/k9s/internal/ui"
 	"github.com/derailed/tcell/v2"
 	"github.com/rs/zerolog/log"
@@ -41,9 +47,16 @@ func (t *Table) Init(ctx context.Context) (err error) {
 	if t.app.Conn() != nil {
 		ctx = context.WithValue(ctx, internal.KeyHasMetrics, t.app.Conn().HasMetrics())
 	}
+	t.app.CustomView = config.NewCustomView()
 	ctx = context.WithValue(ctx, internal.KeyStyles, t.app.Styles)
 	ctx = context.WithValue(ctx, internal.KeyViewConfig, t.app.CustomView)
 	t.Table.Init(ctx)
+	if !t.app.Config.K9s.UI.Reactive {
+		if err := t.app.RefreshCustomViews(); err != nil {
+			log.Warn().Err(err).Msg("CustomViews load failed")
+			t.app.Logo().Warn("Views load failed!")
+		}
+	}
 	t.SetInputCapture(t.keyboard)
 	t.bindKeys()
 	t.GetModel().SetRefreshRate(time.Duration(t.app.Config.K9s.GetRefreshRate()) * time.Second)
@@ -70,7 +83,7 @@ func (t *Table) HeaderIndex(colName string) (int, bool) {
 	return 0, false
 }
 
-// SendKey sends an keyboard event (testing only!).
+// SendKey sends a keyboard event (testing only!).
 func (t *Table) SendKey(evt *tcell.EventKey) {
 	t.app.Prompt().SendKey(evt)
 }
@@ -81,7 +94,7 @@ func (t *Table) keyboard(evt *tcell.EventKey) *tcell.EventKey {
 		return evt
 	}
 
-	if a, ok := t.Actions()[ui.AsKey(evt)]; ok && !t.app.Content.IsTopDialog() {
+	if a, ok := t.Actions().Get(ui.AsKey(evt)); ok && !t.app.Content.IsTopDialog() {
 		return a.Action(evt)
 	}
 
@@ -106,11 +119,8 @@ func (t *Table) EnvFn() EnvFunc {
 
 func (t *Table) defaultEnv() Env {
 	path := t.GetSelectedItem()
-	row, ok := t.GetSelectedRow(path)
-	if !ok {
-		log.Error().Msgf("unable to locate selected row for %q", path)
-	}
-	env := defaultEnv(t.app.Conn().Config(), path, t.GetModel().Peek().Header, row)
+	row := t.GetSelectedRow(path)
+	env := defaultEnv(t.app.Conn().Config(), path, t.GetModel().Peek().Header(), row)
 	env["FILTER"] = t.CmdBuff().GetText()
 	if env["FILTER"] == "" {
 		env["NAMESPACE"], env["FILTER"] = client.Namespaced(path)
@@ -167,17 +177,17 @@ func (t *Table) BufferActive(state bool, k model.BufferKind) {
 }
 
 func (t *Table) saveCmd(evt *tcell.EventKey) *tcell.EventKey {
-	if path, err := saveTable(t.app.Config.K9s.GetScreenDumpDir(), t.app.Config.K9s.CurrentContextDir(), t.GVR().R(), t.Path, t.GetFilteredData()); err != nil {
+	if path, err := saveTable(t.app.Config.K9s.ContextScreenDumpDir(), t.GVR().R(), t.Path, t.GetFilteredData()); err != nil {
 		t.app.Flash().Err(err)
 	} else {
-		t.app.Flash().Infof("File %s saved successfully!", path)
+		t.app.Flash().Infof("File saved successfully: %q", render.Truncate(filepath.Base(path), 50))
 	}
 
 	return nil
 }
 
 func (t *Table) bindKeys() {
-	t.Actions().Add(ui.KeyActions{
+	t.Actions().Bulk(ui.KeyMap{
 		ui.KeyHelp:             ui.NewKeyAction("Help", t.App().helpCmd, true),
 		ui.KeySpace:            ui.NewSharedKeyAction("Mark", t.markCmd, false),
 		tcell.KeyCtrlSpace:     ui.NewSharedKeyAction("Mark Range", t.markSpanCmd, false),
@@ -211,7 +221,22 @@ func (t *Table) cpCmd(evt *tcell.EventKey) *tcell.EventKey {
 		t.app.Flash().Err(err)
 		return nil
 	}
-	t.app.Flash().Info("Current selection copied to clipboard...")
+	t.app.Flash().Info("Resource name copied to clipboard...")
+
+	return nil
+}
+
+func (t *Table) cpNsCmd(evt *tcell.EventKey) *tcell.EventKey {
+	path := t.GetSelectedItem()
+	if path == "" {
+		return evt
+	}
+	ns, _ := client.Namespaced(path)
+	if err := clipboardWrite(ns); err != nil {
+		t.app.Flash().Err(err)
+		return nil
+	}
+	t.app.Flash().Info("Resource namespace copied to clipboard...")
 
 	return nil
 }

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package dao
 
 import (
@@ -37,18 +40,15 @@ type Generic struct {
 func (g *Generic) List(ctx context.Context, ns string) ([]runtime.Object, error) {
 	labelSel, _ := ctx.Value(internal.KeyLabels).(string)
 	if client.IsAllNamespace(ns) {
-		ns = client.AllNamespaces
+		ns = client.BlankNamespace
 	}
 
-	var (
-		ll  *unstructured.UnstructuredList
-		err error
-	)
 	dial, err := g.dynClient()
 	if err != nil {
 		return nil, err
 	}
 
+	var ll *unstructured.UnstructuredList
 	if client.IsClusterScoped(ns) {
 		ll, err = dial.List(ctx, metav1.ListOptions{LabelSelector: labelSel})
 	} else {
@@ -68,12 +68,13 @@ func (g *Generic) List(ctx context.Context, ns string) ([]runtime.Object, error)
 
 // Get returns a given resource.
 func (g *Generic) Get(ctx context.Context, path string) (runtime.Object, error) {
-	var opts metav1.GetOptions
 	ns, n := client.Namespaced(path)
 	dial, err := g.dynClient()
 	if err != nil {
 		return nil, err
 	}
+
+	var opts metav1.GetOptions
 	if client.IsClusterScoped(ns) {
 		return dial.Get(ctx, n, opts)
 	}
@@ -103,7 +104,7 @@ func (g *Generic) ToYAML(path string, showManaged bool) (string, error) {
 // Delete deletes a resource.
 func (g *Generic) Delete(ctx context.Context, path string, propagation *metav1.DeletionPropagation, grace Grace) error {
 	ns, n := client.Namespaced(path)
-	auth, err := g.Client().CanI(ns, g.gvr.String(), []string{client.DeleteVerb})
+	auth, err := g.Client().CanI(ns, g.gvrStr(), n, []string{client.DeleteVerb})
 	if err != nil {
 		return err
 	}

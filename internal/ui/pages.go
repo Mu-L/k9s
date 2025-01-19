@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package ui
 
 import (
@@ -29,7 +32,7 @@ func NewPages() *Pages {
 func (p *Pages) IsTopDialog() bool {
 	_, pa := p.GetFrontPage()
 	switch pa.(type) {
-	case *tview.ModalForm:
+	case *tview.ModalForm, *ModalList:
 		return true
 	default:
 		return false
@@ -99,7 +102,7 @@ func (p *Pages) StackTop(top model.Component) {
 
 func componentID(c model.Component) string {
 	if c.Name() == "" {
-		panic("Component has no name")
+		log.Error().Msg("Component has no name")
 	}
 	return fmt.Sprintf("%s-%p", c.Name(), c)
 }

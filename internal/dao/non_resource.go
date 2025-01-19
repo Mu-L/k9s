@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of K9s
+
 package dao
 
 import (
@@ -26,7 +29,14 @@ func (n *NonResource) Init(f Factory, gvr client.GVR) {
 	n.mx.Unlock()
 }
 
-func (n *NonResource) GetFactory() Factory {
+func (n *NonResource) gvrStr() string {
+	n.mx.RLock()
+	defer n.mx.RUnlock()
+
+	return n.gvr.String()
+}
+
+func (n *NonResource) getFactory() Factory {
 	n.mx.RLock()
 	defer n.mx.RUnlock()
 
@@ -38,10 +48,10 @@ func (n *NonResource) GVR() string {
 	n.mx.RLock()
 	defer n.mx.RUnlock()
 
-	return n.gvr.String()
+	return n.gvrStr()
 }
 
 // Get returns the given resource.
 func (n *NonResource) Get(context.Context, string) (runtime.Object, error) {
-	return nil, fmt.Errorf("NYI!")
+	return nil, fmt.Errorf("nyi")
 }
